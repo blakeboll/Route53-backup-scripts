@@ -1,5 +1,3 @@
-Source functions.sh
-
 requirements:
 bash, jq, ruby, aws cli
 
