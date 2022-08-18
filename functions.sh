@@ -3,7 +3,7 @@
 export PATH=$PATH:$(pwd)
 export AWS_ACCESS_KEY_ID=$1
 export AWS_SECRET_ACCESS_KEY=$2
-mkdir backup
+mkdir backups
 mkdir vars
 
 
