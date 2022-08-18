@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+input_file_path = ARGV.first
+rrsj = File.open(input_file_path) { |f| JSON.parse(f.read) }
+create = JSON.pretty_generate(
+  {
+    'Comment' => 'Restoring from backup',
+    'Changes': rrsj['ResourceRecordSets']
+      .map { |rrs| { 'Action' => 'CREATE', 'ResourceRecordSet' => rrs } }
+  }
+)
+dont_upsert = %w[SOA NS]
+upsert = JSON.pretty_generate(
+  {
+    'Comment' => 'Restoring from backup',
+    'Changes': rrsj['ResourceRecordSets']
+      .reject { |r| dont_upsert.include?(r['Type']) }
+      .map { |rrs| { 'Action' => 'UPSERT', 'ResourceRecordSet' => rrs } }
+  }
+)
+
+upsert_path = input_file_path.gsub(/\.json$/, '-restore-upsert.json')
+create_path = input_file_path.gsub(/\.json$/, '-restore-create.json')
+puts("Writing restore json to #{upsert_path} and #{create_path}")
+File.write(upsert_path, upsert)
+File.write(create_path, create)
+
