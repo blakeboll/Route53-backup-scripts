@@ -21,6 +21,7 @@ RUN mkdir /usr/local/backup-collector && \
 ENV PATH="${PATH}:/usr/local/backup-collector"
 ADD backup_zone /usr/local/backup-collector/
 ADD backup_zones /usr/local/backup-collector/
+ADD generate-restoration /usr/local/backup-collector/
 ADD restore_zone /usr/local/backup-collector/
 ADD restore_zones /usr/local/backup-collector/
 

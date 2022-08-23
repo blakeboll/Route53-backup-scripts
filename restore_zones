@@ -1,7 +1,8 @@
 #!/bin/bash
 
 HERE=$(dirname "$0")
-echo $HERE/backups/$z-restore-$1.json
+aws s3 cp s3://$S3_BUCKET/hosted_zones $HERE/backups/hosted_zones.json
+cat $HERE/backups/hosted_zones.json | jq '.[] | .[] | .Id' | sed 's!/hostedzone/!!' | tr -d '"' > $HERE/backups/zones
 
 if [ -e $HERE/backups/$z-restore-$1.json ]; then
   for z in `cat ./backups/zones`; do

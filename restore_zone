@@ -1,20 +1,43 @@
 #!/bin/bash
 
-if [ -z $1 ];
-  then
-    echo "Missing zone id"
-    return
-  fi
-
-HERE=$(dirname "$0")
-generate-restoration $1
-
-if [ -e $HERE/backups/$1-restore.json ]; then
-  echo "restoring ${1}"
-  aws route53 change-resource-record-sets --hosted-zone-id $1 --change-batch file://$HERE/backups/$1-restore.json | jq '.[] | .Id' | sed 's!/change/!!' | tr -d '"' > ./vars/id
+if [ -z $1 ]; then
+  echo "Missing zone id"
+  return
 fi
 
-#TODO: don't be fucking lazy
-echo "Check the status of your change with:"
-echo "aws route53 get-change --id ${$(cat $HERE/vars/id)}"
-rm $HERE/vars/id
+HERE=$(dirname "$0")
+
+# Write the current state of the hosted zone to disk.
+aws route53 list-resource-record-sets \
+  --hosted-zone-id $1 > $HERE/backups/$1-current.json
+
+if [ -z $2 ]; then
+  # Use the sugary command to get the latest backup.
+  aws s3 cp s3://$S3_BUCKET/$1 $HERE/backups/$1.json
+else
+  # Use the verbose command to get the specified backup version.
+  aws s3api get-object \
+    --bucket $S3_BUCKET  \
+    --key $1  \
+    --version-id $2 \
+    $HERE/backups/$1.json > /dev/null
+fi
+
+# Diff the current state with the desired state to generate a change batch.
+generate-restoration $HERE/backups/$1.json $HERE/backups/$1-current.json
+
+if [ -e $HERE/backups/$1-restore.json ]; then
+  # Restore it!
+  aws route53 change-resource-record-sets \
+    --hosted-zone-id $1 \
+    --change-batch file://$HERE/backups/$1-restore.json \
+    | jq '.[] | .Id' \
+    | sed 's!/change/!!' \
+    | tr -d '"' > $HERE/backups/id
+  # TODO: Poll until it is INSYNC
+  echo "Check the status of your change with:"
+  echo "aws route53 get-change --id $(cat $HERE/backups/id)"
+  rm $HERE/backups/id
+else
+  echo 'nothing to do'
+fi

@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+
+require 'json'
+
+path_to_desired = ARGV[0]
+path_to_current = ARGV[1]
+desired = File.open(path_to_desired) { |f| JSON.parse(f.read) }['ResourceRecordSets']
+current = File.open(path_to_current) { |f| JSON.parse(f.read) }['ResourceRecordSets']
+
+return if desired == current
+
+changed = desired - current
+changes = current - desired
+
+return if changed.length == 0 && changes.length == 0
+
+changed_names = changed.map { |r| r['Name'] }
+added = changes.reject { |r| changed_names.include?(r['Name']) }
+
+File.write(
+  path_to_desired.gsub(/\.json$/, '-restore.json'),
+  JSON.pretty_generate(
+    {
+      'Comment' => 'Restoring from backup',
+      'Changes' =>
+        added.map { |rrs| { 'Action' => 'DELETE', 'ResourceRecordSet' => rrs } } +
+        changed.map { |rrs| { 'Action' => 'UPSERT', 'ResourceRecordSet' => rrs } }
+    }
+  )
+)

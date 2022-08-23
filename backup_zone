@@ -5,6 +5,11 @@ if [ -z $1 ]; then
   return
 fi
 
+if [ -z $S3_BUCKET ]; then
+  echo "Missing S3 bucket name"
+  return
+fi
+
 HERE=$(dirname "$0")
 echo $1
 
@@ -14,9 +19,7 @@ if [ -z $2 ]; then
     --hosted-zone-id $1 > $HERE/backups/$1.json
 fi
 
-# Put backups in s3
-S3_BUCKET=webscale-dev-route53-backups
-
+# Create the bucket if it doesn't exist.
 if aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then :; else
   aws s3api create-bucket \
     --bucket $S3_BUCKET \
