@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -z $1 ]; then
+  echo "Missing zone id"
+  return
+fi
+
+HERE=$(dirname "$0")
+echo $1
+
+if [ -z $2 ]; then
+  # get all records in the hosted zone, write them to a file on disk.
+  aws route53 list-resource-record-sets \
+    --hosted-zone-id $1 > $HERE/backups/$1.json
+fi
+
+# Put backups in s3
+S3_BUCKET=webscale-dev-route53-backups
+
+if aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then :; else
+  aws s3api create-bucket \
+    --bucket $S3_BUCKET \
+    --region us-east-1 > /dev/null
+
+  aws s3api put-bucket-versioning \
+    --bucket $S3_BUCKET \
+    --versioning-configuration Status=Enabled
+fi
+
+# v = bucket object version id
+v=$(aws s3api put-object \
+  --bucket $S3_BUCKET \
+  --body $HERE/backups/$1.json \
+  --key $1 | jq '.VersionId' | tr -d '"')
+
+echo new version $v of object hostedzone/$1 in bucket $S3_BUCKET

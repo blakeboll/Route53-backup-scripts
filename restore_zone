@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -z $1 ];
+  then
+    echo "Missing zone id"
+    return
+  fi
+
+HERE=$(dirname "$0")
+generate-restoration $1
+
+if [ -e $HERE/backups/$1-restore.json ]; then
+  echo "restoring ${1}"
+  aws route53 change-resource-record-sets --hosted-zone-id $1 --change-batch file://$HERE/backups/$1-restore.json | jq '.[] | .Id' | sed 's!/change/!!' | tr -d '"' > ./vars/id
+fi
+
+#TODO: don't be fucking lazy
+echo "Check the status of your change with:"
+echo "aws route53 get-change --id ${$(cat $HERE/vars/id)}"
+rm $HERE/vars/id

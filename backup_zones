@@ -1,0 +1,9 @@
+#!/bin/bash
+
+HERE=$(dirname "$0")
+aws route53 list-hosted-zones | jq '.[] | .[] | .Id' | sed 's!/hostedzone/!!' | tr -d '"' > $HERE/backups/zones
+aws route53 list-hosted-zones > $HERE/backups/hosted_zones.json
+backup_zone hosted_zones 'skip'
+for z in `cat $HERE/backups/zones`; do
+  backup_zone $z
+done

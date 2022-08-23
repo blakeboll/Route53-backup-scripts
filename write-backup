@@ -26,4 +26,3 @@ create_path = input_file_path.gsub(/\.json$/, '-restore-create.json')
 puts("Writing restore json to #{upsert_path} and #{create_path}")
 File.write(upsert_path, upsert)
 File.write(create_path, create)
-

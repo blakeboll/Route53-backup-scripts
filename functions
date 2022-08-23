@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# This file is now just for convenience testing new code locally.
+
+function backup_zone() {
+  HERE=$(dirname "$0")
+  echo $1
+  # get all records in the hosted zone, write them to a file on disk.
+  aws route53 list-resource-record-sets \
+    --hosted-zone-id $1 > $HERE/backups/$1.json
+  # Put backups in s3
+  S3_BUCKET=webscale-dev-route53-backups
+
+  if aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then
+    # Bucket exists already.
+  else
+    aws s3api create-bucket \
+      --bucket $S3_BUCKET \
+      --region us-east-1 > /dev/null
+
+    aws s3api put-bucket-versioning \
+      --bucket $S3_BUCKET \
+      --versioning-configuration Status=Enabled
+  fi
+
+  # Output of this == new version id in the bucket.
+  v=$(aws s3api put-object \
+  --bucket $S3_BUCKET \
+  --body $HERE/backups/$1.json \
+  --key $1 | jq '.VersionId' | tr -d '"')
+
+  echo new version $v of file $1.json in bucket $S3_BUCKET
+}
+
+function backup_zones() {
+  HERE=$(dirname "$0")
+  aws route53 list-hosted-zones | jq '.[] | .[] | .Id' | sed 's!/hostedzone/!!' | tr -d '"' > $HERE/backups/zones
+  aws route53 list-hosted-zones > $HERE/backups/hosted_zones.json
+  for z in `cat $HERE/backups/zones`;
+    do
+      backup_zone $z
+    done
+}
+
+function restore_zone() {
+  if [ -z $1 ];
+    then
+      echo "Missing action ('upsert' | 'create')"
+      return
+    fi
+  if [ -z $2 ];
+    then
+      echo "Missing zone id"
+      return
+    fi
+  if [ -e $(pwd)/backups/$2-restore-$1.json ];
+    then
+      echo "restoring ${2}"
+      aws route53 change-resource-record-sets --hosted-zone-id $2 --change-batch file://$(pwd)/backups/$2-restore-$1.json | jq '.[] | .Id' | sed 's!/change/!!' | tr -d '"' > ./vars/id
+    fi
+  echo "Check the status of your change with:"
+  echo "aws route53 get-change --id ${$(cat ./vars/id)}"
+  rm ./vars/id
+}
+
+function restore_zones() {
+  if [ -z $1 ];
+    then
+      echo "Missing action ('upsert' | 'create')"
+      return
+    fi
+  echo $(pwd)/backups/$z-restore-$1.json
+  if [ -e $(pwd)/backups/$z-restore-$1.json ];
+    then
+      for z in `cat ./backups/zones`;
+        do
+          echo $z
+          restore_zone $1 $z
+        done
+    fi
+  echo 'done'
+}

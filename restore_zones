@@ -1,0 +1,12 @@
+#!/bin/bash
+
+HERE=$(dirname "$0")
+echo $HERE/backups/$z-restore-$1.json
+
+if [ -e $HERE/backups/$z-restore-$1.json ]; then
+  for z in `cat ./backups/zones`; do
+    restore_zone $z
+  done
+fi
+
+echo 'done'
